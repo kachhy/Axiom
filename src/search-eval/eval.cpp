@@ -26,7 +26,7 @@ struct PawnEntry {
 
 constexpr size_t PAWN_TABLE_SIZE = TARGET_BYTES / sizeof(PawnEntry); // 4 MB
 constexpr size_t PAWN_TABLE_MASK = PAWN_TABLE_SIZE - 1;              // 262144 - 1 for 4 MB
-alignas(64) static PawnEntry pawn_evals[PAWN_TABLE_SIZE];            // Pawn hash table: 262144 entries, which is 2 ^ 18
+alignas(64) static thread_local PawnEntry pawn_evals[PAWN_TABLE_SIZE];
 
 struct PieceCounts {
     int wp, bp, wn, bn, wb, bb, wr, br, wq, bq;
@@ -706,7 +706,7 @@ int eval(const Board& board) {
     if (isMaterialDraw(board)) {
         return 0;
     }
-
+    
     if (use_nnue) {
         int nnue_score = evaluate(board);
         nnue_score = nnue_score * fmr_scale[board.getFMR()] / 200;

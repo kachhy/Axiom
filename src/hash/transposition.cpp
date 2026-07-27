@@ -41,9 +41,10 @@ void TTable::insert(const Board& board, Move best_move, int16_t score, uint8_t b
     const uint8_t bound_age = packBoundAge(bound, table_age, piece_type);
     const uint16_t stored_key = encodeKey(key, move16, score, depth, bound_age);
     EntryTriple& bucket = table[bucketIndex(board.hash())];
+    const uint8_t count = bucket.count; // Copy to fix a TOCTOU race
 
-    if (bucket.count < EntryTriple::CAPACITY) {
-        for (uint8_t i = 0; i < bucket.count; i++) {
+    if (count < EntryTriple::CAPACITY) {
+        for (uint8_t i = 0; i < count; i++) {
             if (decodeKey(bucket.entries[i]) == key) {
                 if (depth >= bucket.entries[i].depth || bound == EXACTBOUND) {
                     bucket.entries[i] = { stored_key, move16, score, depth, bound_age };
@@ -52,8 +53,8 @@ void TTable::insert(const Board& board, Move best_move, int16_t score, uint8_t b
             }
         }
 
-        bucket.entries[bucket.count] = { stored_key, move16, score, depth, bound_age };
-        bucket.count++;
+        bucket.entries[count] = { stored_key, move16, score, depth, bound_age };
+        __atomic_fetch_add(&bucket.count, 1, __ATOMIC_RELAXED); // increment bucket.count while leaving our bucket as trivially copyable
         table_size++;
         return;
     }
@@ -67,7 +68,7 @@ void TTable::insert(const Board& board, Move best_move, int16_t score, uint8_t b
 
     uint8_t kickout_index = 0;
     int64_t best_kickout_score = static_cast<int64_t>(bucket.entries[0].depth) - ((table_age - ageOf(bucket.entries[0].bound_age)) & TT_AGE_MASK);
-    for (uint8_t i = 1; i < bucket.count; i++) {
+    for (uint8_t i = 1; i < count; i++) {
         if (decodeKey(bucket.entries[i]) == key) {
             if (depth >= bucket.entries[i].depth || bound == EXACTBOUND) {
                 bucket.entries[i] = { stored_key, move16, score, depth, bound_age };
@@ -89,12 +90,13 @@ void TTable::insert(const Board& board, Move best_move, int16_t score, uint8_t b
 bool TTable::fetch(const Board& board, Entry& entry) {
     const uint16_t key = keyOf(board.hash());
     EntryTriple& bucket = table[bucketIndex(board.hash())];
+    const uint8_t count = bucket.count;
 
-    if (!bucket.count) {
+    if (!count) {
         return false;
     }
 
-    for (uint8_t i = 0; i < bucket.count; i++) {
+    for (uint8_t i = 0; i < count; i++) {
         PackedEntry& packed = bucket.entries[i];
         if (decodeKey(packed) == key) {
             entry.best_move = unpackMove(packed.move16, pieceOf(packed.bound_age), board.getSTM());

@@ -219,6 +219,8 @@ static inline void go(Board& board) {
     searching = true;
     tt.incAge();
 
+    uint16_t search_max_depth =  (params.infinite || params.depth == -1) ? 256 : params.depth;
+
     int best_score;
     std::vector<std::thread> helpers;
     std::vector<Board> helper_boards(num_threads - 1, board);  // copy ctor per helper
@@ -232,11 +234,11 @@ static inline void go(Board& board) {
 
         helpers.emplace_back([&, i, helper_params] {
             stdin_enabled = false; // only the main thread may touch std::cin
-            search(helper_boards[i], 256, dummy_scores[i], helper_params);
+            search(helper_boards[i], search_max_depth, dummy_scores[i], helper_params);
         });
     }
 
-    Move best_move = search(board, (params.infinite || params.depth == -1) ? 256 : params.depth, best_score, params);
+    Move best_move = search(board, search_max_depth, best_score, params);
     
     searching = false;
     for (auto& t : helpers) {
