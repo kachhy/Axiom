@@ -24,6 +24,8 @@ constexpr uint8_t ASPIRATION_DEPTH_CUTOFF = 3;
 constexpr float ASPIRATION_SCALAR = 1.290771;
 constexpr int SEE_DEPTH_MAX = 8;
 constexpr int PROB_BETA_OFFSET = 180;
+constexpr int DELTA_PRUNING_THRES = 200;
+constexpr int DELTA_PRUNING_PROM_THRES = 850;
 
 extern thread_local uint64_t nodes;
 extern int multi_pv;

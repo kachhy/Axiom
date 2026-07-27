@@ -162,6 +162,11 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
         std::swap(scores[i], scores[best_move_index]);
 
         Move noisy_move = moves[i];
+        DefaultPiece victim = makeDefaultPiece(board.pieceAt(To(noisy_move)));
+        // Delta pruning
+        if (static_eval + SEE_VALUES[victim] + DELTA_PRUNING_THRES + (!!Prom(noisy_move) * DELTA_PRUNING_PROM_THRES) <= alpha) {
+            continue; 
+        }
         // SEE
         if (!board.inCheck() && !staticExchangeEval(board, noisy_move, 0)) {
             continue;
