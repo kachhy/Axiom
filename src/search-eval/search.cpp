@@ -165,8 +165,8 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
         Piece victim_piece = IsEP(noisy_move) ? makePiece(PAWN, board.getXSTM()) : board.pieceAt(To(noisy_move));
         DefaultPiece victim = makeDefaultPiece(victim_piece);
         // Delta pruning
-        if (static_eval + SEE_VALUES[victim] + DELTA_PRUNING_THRES + (!!Prom(noisy_move) * DELTA_PRUNING_PROM_THRES) <= alpha) {
-            continue; 
+        if (!board.inCheck() && static_eval + SEE_VALUES[victim] + DELTA_PRUNING_THRES + (!!Prom(noisy_move) * DELTA_PRUNING_PROM_THRES) <= alpha) {
+            continue;
         }
         // SEE
         if (!board.inCheck() && !staticExchangeEval(board, noisy_move, 0)) {
