@@ -7,7 +7,7 @@
 #include <cstdint>
 
 // Architecture: (INPUT_SIZE -> HIDDEN_SIZE)x2 -> 8
-constexpr size_t NUM_KING_BUCKETS = 2;
+constexpr size_t NUM_KING_BUCKETS = 4;
 constexpr size_t NUM_OUTPUT_BUCKETS = 8;
 constexpr size_t INPUT_SIZE = 768;
 constexpr size_t HIDDEN_SIZE = 1024;
@@ -16,12 +16,12 @@ constexpr size_t HIDDEN_SIZE = 1024;
 constexpr uint8_t KING_BUCKETS[32] = {
     0, 0, 0, 0,
     0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
     1, 1, 1, 1,
     1, 1, 1, 1,
-    1, 1, 1, 1,
-    1, 1, 1, 1,
+    2, 2, 2, 2,
+    2, 2, 2, 2,
+    3, 3, 3, 3,
+    3, 3, 3, 3,
 };
 
 // Horizontal mirror flip files when king is on e-h files
