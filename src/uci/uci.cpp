@@ -113,7 +113,7 @@ static inline void initOptions() {
     setOption("Threads", SpinOption{ 1, 1, 1, nullptr });
     setOption("MultiPV", SpinOption{ 1, 255, 1, [](int mpv) { multi_pv = mpv; } });
     setOption("NNUE", CheckOption{ true, [](bool val) { use_nnue = val; } });
-    setOption("EvalFile", StringOption{ "nn-1697fd3fc841dc25-v2.nnue", [](std::string path) {
+    setOption("EvalFile", StringOption{ "nn-0d2fd98ff872a9a1-v2.nnue", [](std::string path) {
         if (path == default_net && loadNNUEFromMemory(gNNUEWeightsData, gNNUEWeightsSize)) {
             std::cout << "info string NNUE eval by " << default_net << std::endl;
         } else {
