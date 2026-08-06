@@ -26,7 +26,11 @@ constexpr int SEE_DEPTH_MAX = 8;
 constexpr int PROB_BETA_OFFSET = 180;
 
 extern thread_local uint64_t nodes;
+extern thread_local uint64_t tb_hits;
 extern int multi_pv;
+extern short syz_probe_depth;
+extern short syz_probe_limit;
+extern bool syz_fmr;
 
 struct GoParams;
 

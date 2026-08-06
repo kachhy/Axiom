@@ -5,6 +5,7 @@
 #include "movegen/movegen.h"
 #include "search-eval/eval.h"
 #include "search-eval/search.h"
+#include "nnue/nnue.h"
 #include "uci/uci.h"
 #include <atomic>
 #include <chrono>
@@ -24,10 +25,12 @@ static std::atomic<size_t> last_progress = 0;
 static std::mutex progress_mutex;
 static std::chrono::high_resolution_clock::time_point datagen_start;
 
+const static std::string SYZYGY_PATH("");
+const static std::string NNUE_PATH("");
 constexpr static int16_t DG_DEPTH = 128;
-constexpr static int32_t DG_NODES = 5000;
+constexpr static int32_t DG_NODES = 4000;
 constexpr static int16_t DG_RANDOM_MOVES = 8;
-constexpr static size_t DG_POSITION_GOAL = 40000000;
+constexpr static size_t DG_POSITION_GOAL = 6000000;
 constexpr static int DG_THREADS = 24;
 
 // Filtering thresholds
@@ -252,6 +255,20 @@ static void datagenWorker(int thread_id) {
 }
 
 void runDatagen() {
+    if (!SYZYGY_PATH.empty()) {
+        if (tb_init(SYZYGY_PATH.c_str())) {
+            std::cout << "Loaded Syzygy for datagen" << std::endl;
+        }
+    }
+
+    if (!NNUE_PATH.empty()) {
+        if (!loadNNUE(NNUE_PATH)) {
+            std::cout << "Unable to load " << NNUE_PATH << std::endl;
+        } else {
+            std::cout << "NNUE eval by " << NNUE_PATH << std::endl;
+        }
+    }
+
     std::vector<std::thread> workers;
     workers.reserve(DG_THREADS);
     datagen_start = std::chrono::high_resolution_clock::now();

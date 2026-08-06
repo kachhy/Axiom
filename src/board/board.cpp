@@ -361,10 +361,18 @@ void Board::accumulatorPropagate() const { // Update the top accumulator by walk
     while (clean > 0 && accumulator_stack[clean].accumulator_dirty) {
         clean--;
     }
-    
+
     for (int k = clean + 1; k <= acc_ply; k++) { // note: <= acc_ply (compute target too)
         accumulator_stack[k].applyDelta(accumulator_stack[k - 1]);
     }
+}
+
+uint64_t Board::probeWDL() {
+    return tb_probe_wdl(
+        occ[WHITE], occ[BLACK], piece_bb[WHITE_KING] | piece_bb[BLACK_KING], piece_bb[WHITE_QUEEN] | piece_bb[BLACK_QUEEN], piece_bb[WHITE_ROOK] | piece_bb[BLACK_ROOK],
+        piece_bb[WHITE_BISHOP] | piece_bb[BLACK_BISHOP], piece_bb[WHITE_KNIGHT] | piece_bb[BLACK_KNIGHT], piece_bb[WHITE_PAWN] | piece_bb[BLACK_PAWN],
+        ep_square == NO_SQUARE ? 0 : ep_square, stm == WHITE ? PYRRHIC_WHITE : PYRRHIC_BLACK
+    );
 }
 
 void Board::makeMove(Move move) {

@@ -22,7 +22,11 @@
 
 thread_local uint16_t seldepth;
 thread_local uint64_t nodes;
+thread_local uint64_t tb_hits;
 int multi_pv = 1;
+short syz_probe_depth = 1;
+short syz_probe_limit = 7;
+bool syz_fmr = true;
 
 struct PVLine {
     uint16_t cur_move;
@@ -67,7 +71,7 @@ void printInfo(const Board& src, int depth, int seldepth, int score, const char*
     if (bound) {
         std::cout << " " << bound;
     }
-    std::cout << " nodes " << nodes << " nps " << nps;
+    std::cout << " nodes " << nodes << " nps " << nps << " tbhits " << tb_hits;
     if (multipv != -1) {
         std::cout << " multipv " << multipv;
     }
@@ -278,6 +282,51 @@ int search(
         }
     }
 
+    int max_score = SCORE_MAX;
+    int best_score = -SCORE_MAX;
+
+    // Probe tablebases
+    if constexpr (Type != ROOT_NODE) {
+        if (bitCount(board.getOcc(BOTH)) <= syz_probe_limit
+            && ss->excluded == NO_MOVE
+            && depth >= syz_probe_depth
+            && !board.getCastlingRights()
+            && (board.getFMR() == 0 || !syz_fmr)) {
+            uint64_t wdl = board.probeWDL();
+            
+            if (wdl != TB_RESULT_FAILED) {
+                tb_hits++;
+                int score;
+                TTBound bound;
+
+                if (wdl == TB_WIN) {
+                    score = TB_WIN_SCORE - ply;
+                    bound = LOWERBOUND;
+                } else if (wdl == TB_LOSS) {
+                    score = -TB_WIN_SCORE + ply;
+                    bound = UPPERBOUND;
+                } else {
+                    score = 0;
+                    bound = EXACTBOUND;
+                }
+
+                if (bound == EXACTBOUND || (bound == LOWERBOUND ? score >= beta : score <= alpha)) {
+                    tt.insert(board, NO_MOVE, scoreToTT(score, ply), bound, depth);
+                    return score;
+                }
+
+                if (is_pv) {
+                    if (bound == LOWERBOUND) {
+                        best_score = score;
+                        alpha = std::max(alpha, score);
+                    } else {
+                        max_score = score;
+                    }
+                }
+            }
+        }
+    }
+
     bool in_check = board.inCheck();
     if (in_check) {
         depth++; // check extension
@@ -391,7 +440,6 @@ int search(
     }
 
     int original_alpha = alpha;
-    int best_score = -SCORE_MAX;
     Move best_move = NO_MOVE;
 
     // PVS
@@ -550,6 +598,10 @@ int search(
         return in_check ? -SCORE_MAX + ply : 0; // checkmate or stalemate
     }
 
+    if (is_pv) {
+        best_score = std::min(max_score, best_score);
+    }
+
     // If only the excluded move was available, fail low (move is singular)
     if (ss->excluded != NO_MOVE && best_score == -SCORE_MAX) {
         return alpha;
@@ -567,6 +619,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     Move best_move = NO_MOVE;
     PVLine pv_table[MAX_PLY + 1]; // pre-allocated, indexed by ply
     nodes = 0;
+    tb_hits = 0;
     best_score = 0;
 
     // Setup search stack. Pad the front by 4 so continuation history can read

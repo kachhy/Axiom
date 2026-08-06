@@ -7,6 +7,7 @@ CXXFLAGS += -DEVALFILE='"$(EVALFILE)"'
 
 OBJDIR=build
 SRC=$(shell find src -name '*.cpp')
+C_SRC=$(filter-out %tbchess.c,$(shell find src -name '*.c'))
 
 ifeq ($(MAKECMDGOALS),)
 	MAKECMDGOALS += release
@@ -22,7 +23,7 @@ ifneq ($(filter release,$(MAKECMDGOALS)),)
 endif
 ifneq ($(filter lto,$(MAKECMDGOALS)),)
 	CXXFLAGS += -O3 -flto
-	LDFLAGS += -flto 
+	LDFLAGS += -flto
 ifneq ($(shell uname),Darwin)
 	LDFLAGS += -static
 endif
@@ -53,7 +54,8 @@ ifneq ($(filter perft,$(MAKECMDGOALS)),)
 endif
 
 OBJ=$(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRC))
-DEPS=$(OBJ:.o=.d)
+C_OBJ=$(patsubst src/%.c,$(OBJDIR)/%.o,$(C_SRC))
+DEPS=$(OBJ:.o=.d) $(C_OBJ:.o=.d)
 EXE ?= $(OBJDIR)/Onslaught
 
 release: $(EXE)
@@ -64,7 +66,7 @@ pg: $(EXE)
 tune: $(EXE)
 perft: $(EXE)
 
-$(EXE): $(OBJ)
+$(EXE): $(OBJ) $(C_OBJ)
 	@echo "  LINK $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) $(LDFLAGS) $^ -o $@
@@ -78,6 +80,11 @@ $(OBJDIR)/%.o: src/%.cpp
 	@echo "  CXXC $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/%.o: src/%.c
+	@echo "  CXXC $@"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS) -x c++ -c $< -o $@
 
 clean:
 	rm -rf $(OBJDIR)

@@ -3,6 +3,7 @@
 #include "nnue/nnue.h"
 #include "search-eval/eval.h"
 #include "search-eval/search.h"
+#include "syzygy/tbprobe.h"
 #include <sstream>
 
 #ifdef _WIN32
@@ -39,8 +40,10 @@ static inline CmdSetOption parseSetOption(std::istream& is) {
     is >> token;
     CmdSetOption cmd{ token, std::nullopt };
     if (is >> token && token == "value") {
-        is >> token;
-        cmd.value = token;
+        std::string rest;
+        std::getline(is, rest);
+        size_t start = rest.find_first_not_of(' ');
+        cmd.value = start == std::string::npos ? "" : rest.substr(start);
     }
     return cmd;
 }
@@ -113,6 +116,19 @@ static inline void initOptions() {
     setOption("Threads", SpinOption{ 1, 1, 1, nullptr });
     setOption("MultiPV", SpinOption{ 1, 255, 1, [](int mpv) { multi_pv = mpv; } });
     setOption("NNUE", CheckOption{ true, [](bool val) { use_nnue = val; } });
+    setOption("SyzygyPath", StringOption{ "", [](std::string path) {
+        tb_free();
+        if (tb_init(path.c_str())) {
+            std::cout << "info string Loaded Syzygy tablebases successfully!" << std::endl;
+        } else {
+            std::cout << "info string Unable to load Syzygy tablebases." << std::endl;
+        }
+    } });
+
+    setOption("SyzygyProbeDepth", SpinOption{ 1, 100, 1, [](int spd) { syz_probe_depth = spd; } });
+    setOption("Syzygy50MoveRule", CheckOption{ true, [](bool sfmr) { syz_fmr = sfmr; } });
+    setOption("SyzygyProbeLimit", SpinOption{ 0, 7, 7, [](int spl) { syz_probe_limit = spl; } });
+
     setOption("EvalFile", StringOption{ "nn-0d2fd98ff872a9a1-v2.nnue", [](std::string path) {
         if (path == default_net && loadNNUEFromMemory(gNNUEWeightsData, gNNUEWeightsSize)) {
             std::cout << "info string NNUE eval by " << default_net << std::endl;
@@ -247,6 +263,7 @@ int uciStartup() {
         } else if (buffer == "isready") {
             return 1; // ready to start the game
         } else if (buffer == "quit") {
+            tb_free();
             return 0; // quit the engine
         }
 

@@ -5,6 +5,7 @@
 #include "core/move.h"
 #include "nnue/accumulator.h"
 #include "search-eval/terms.h"
+#include "syzygy/tbprobe.h"
 #include <algorithm>
 #include <cstring>
 #include <vector>
@@ -74,6 +75,9 @@ public:
     Accumulator& getAccumulator() const { return accumulator_stack[acc_ply]; }
     void refreshAccumulator() { accumulator_stack[acc_ply].refresh(*this); }
     void accumulatorPropagate() const;
+
+    // Syzygy functions
+    uint64_t probeWDL();
 
     // Make and undo move
     void makeMove(Move move);

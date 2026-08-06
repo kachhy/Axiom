@@ -19,14 +19,14 @@ static const std::array<int, 201> fmr_scale = [](){
 constexpr size_t TABLE_SIZE_MB = 4;
 constexpr size_t TARGET_BYTES = TABLE_SIZE_MB * MEGABYTE;
 
-struct PawnEntry {
+struct PawnHashEntry {
     uint64_t hash = 0;
     Score eval;
 };
 
-constexpr size_t PAWN_TABLE_SIZE = TARGET_BYTES / sizeof(PawnEntry); // 4 MB
-constexpr size_t PAWN_TABLE_MASK = PAWN_TABLE_SIZE - 1;              // 262144 - 1 for 4 MB
-alignas(64) static PawnEntry pawn_evals[PAWN_TABLE_SIZE];            // Pawn hash table: 262144 entries, which is 2 ^ 18
+constexpr size_t PAWN_TABLE_SIZE = TARGET_BYTES / sizeof(PawnHashEntry); // 4 MB
+constexpr size_t PAWN_TABLE_MASK = PAWN_TABLE_SIZE - 1;                  // 262144 - 1 for 4 MB
+alignas(64) static PawnHashEntry pawn_evals[PAWN_TABLE_SIZE];            // Pawn hash table: 262144 entries, which is 2 ^ 18
 
 struct PieceCounts {
     int wp, bp, wn, bn, wb, bb, wr, br, wq, bq;
