@@ -45,7 +45,7 @@
 #define PYRRHIC_LSB(x)                   (getLSB(x))
 #define PYRRHIC_POPLSB(x)                (popLSB(*(x)))
 
-#define PYRRHIC_PAWN_ATTACKS(sq, c)      (getPawnAttacks(static_cast<Square>(sq), c == PYRRHIC_WHITE ? WHITE : BLACK))
+#define PYRRHIC_PAWN_ATTACKS(sq, c)      (getPawnAttacks(static_cast<Square>(sq), c == PYRRHIC_WHITE ? BLACK : WHITE))
 #define PYRRHIC_KNIGHT_ATTACKS(sq)       (getKnightAttacks(static_cast<Square>(sq)))
 #define PYRRHIC_BISHOP_ATTACKS(sq, occ)  (getBishopAttacks(static_cast<Square>(sq), occ))
 #define PYRRHIC_ROOK_ATTACKS(sq, occ)    (getRookAttacks(static_cast<Square>(sq), occ))

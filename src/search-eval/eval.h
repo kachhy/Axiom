@@ -4,7 +4,7 @@
 #include "board/board.h"
 
 constexpr int SCORE_MAX = 32000;
-constexpr int TB_WIN_SCORE = SCORE_MAX - MAX_PLY - 1;
+constexpr int TB_WIN_SCORE = SCORE_MAX - MAX_GAME_MOVES - MAX_PLY - 1;
 
 // TODO: Move these to consteval for C++20
 #ifdef TUNING

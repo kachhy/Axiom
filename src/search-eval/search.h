@@ -25,6 +25,8 @@ constexpr float ASPIRATION_SCALAR = 1.290771;
 constexpr int SEE_DEPTH_MAX = 8;
 constexpr int PROB_BETA_OFFSET = 180;
 
+constexpr uint8_t TT_HIT_DEPTH_BONUS = 6;
+
 extern thread_local uint64_t nodes;
 extern thread_local uint64_t tb_hits;
 extern int multi_pv;

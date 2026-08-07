@@ -30,6 +30,8 @@ constexpr uint16_t MAX_PLY = 256;
 
 constexpr inline Side getPieceSide(Piece piece) { return piece <= WHITE_KING ? WHITE : BLACK; }
 
+struct TbRootMoves;
+
 struct EvalInfo {
     BitBoard piece_attacks[12];
     BitBoard square_attacks[64];
@@ -78,6 +80,7 @@ public:
 
     // Syzygy functions
     uint64_t probeWDL();
+    bool probeDTZ(TbRootMoves& results, bool has_repeated);
 
     // Make and undo move
     void makeMove(Move move);
