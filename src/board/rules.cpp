@@ -1,6 +1,23 @@
 #include "rules.h"
 #include "movegen/movegen.h"
 
+bool hasRepeated(const Board& board) {
+    const int hist_ply = board.getHistPly();
+    const int start = std::max(0, hist_ply - static_cast<int>(board.getFMR()));
+    const Board::BoardHistory* board_history = board.getBoardHistory();
+
+    for (int i = start; i <= hist_ply; i++) {
+        uint64_t key = (i == hist_ply) ? board.hash() : board_history[i].zobrist_hash;
+        for (int j = i + 4; j <= hist_ply; j += 2) {
+            uint64_t other = (j == hist_ply) ? board.hash() : board_history[j].zobrist_hash;
+            if (key == other) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool isMaterialDraw(const Board& board) {
     if (board.getPieceBB(WHITE_PAWN) | board.getPieceBB(BLACK_PAWN) | board.getPieceBB(WHITE_ROOK) | board.getPieceBB(BLACK_ROOK) | board.getPieceBB(WHITE_QUEEN) |
         board.getPieceBB(BLACK_QUEEN)) { // Non-material draw

@@ -5,6 +5,7 @@
 #include "core/move.h"
 #include "nnue/accumulator.h"
 #include "search-eval/terms.h"
+#include "syzygy/tbprobe.h"
 #include <algorithm>
 #include <cstring>
 #include <vector>
@@ -28,6 +29,8 @@ constexpr BitBoard BLACK_QUEENSIDE_CASTLE_THREAT_MASK = 0x000000000000000C;
 constexpr uint16_t MAX_PLY = 256;
 
 constexpr inline Side getPieceSide(Piece piece) { return piece <= WHITE_KING ? WHITE : BLACK; }
+
+struct TbRootMoves;
 
 struct EvalInfo {
     BitBoard piece_attacks[12];
@@ -74,6 +77,10 @@ public:
     Accumulator& getAccumulator() const { return accumulator_stack[acc_ply]; }
     void refreshAccumulator() { accumulator_stack[acc_ply].refresh(*this); }
     void accumulatorPropagate() const;
+
+    // Syzygy functions
+    uint64_t probeWDL();
+    bool probeDTZ(TbRootMoves& results, bool has_repeated);
 
     // Make and undo move
     void makeMove(Move move);

@@ -3,6 +3,7 @@
 
 #include "board.h"
 
+bool hasRepeated(const Board& board);
 bool isMaterialDraw(const Board& board);
 bool isRepetitionDraw(const Board& board, uint32_t ply);
 bool isFiftyMoveRuleDraw(const Board& board);

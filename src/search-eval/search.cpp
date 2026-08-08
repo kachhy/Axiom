@@ -22,7 +22,11 @@
 
 thread_local uint16_t seldepth;
 thread_local uint64_t nodes;
+thread_local uint64_t tb_hits;
 int multi_pv = 1;
+short syz_probe_depth = 1;
+short syz_probe_limit = 7;
+bool syz_fmr = true;
 
 struct PVLine {
     uint16_t cur_move;
@@ -67,7 +71,7 @@ void printInfo(const Board& src, int depth, int seldepth, int score, const char*
     if (bound) {
         std::cout << " " << bound;
     }
-    std::cout << " nodes " << nodes << " nps " << nps;
+    std::cout << " nodes " << nodes << " nps " << nps << " tbhits " << tb_hits;
     if (multipv != -1) {
         std::cout << " multipv " << multipv;
     }
@@ -278,6 +282,52 @@ int search(
         }
     }
 
+    int max_score = SCORE_MAX;
+    int best_score = -SCORE_MAX;
+
+    // Probe tablebases
+    if constexpr (Type != ROOT_NODE) {
+        if (TB_LARGEST > 0
+            && bitCount(board.getOcc(BOTH)) <= std::min<int>(syz_probe_limit, TB_LARGEST)
+            && ss->excluded == NO_MOVE
+            && depth >= syz_probe_depth
+            && !board.getCastlingRights()
+            && (board.getFMR() == 0 || !syz_fmr)) {
+            uint64_t wdl = board.probeWDL();
+            
+            if (wdl != TB_RESULT_FAILED) {
+                tb_hits++;
+                int score;
+                TTBound bound;
+
+                if (wdl == TB_WIN || (!syz_fmr && wdl == TB_CURSED_WIN)) {
+                    score = TB_WIN_SCORE - ply;
+                    bound = LOWERBOUND;
+                } else if (wdl == TB_LOSS || (!syz_fmr && wdl == TB_BLESSED_LOSS)) {
+                    score = -TB_WIN_SCORE + ply;
+                    bound = UPPERBOUND;
+                } else {
+                    score = 0;
+                    bound = EXACTBOUND;
+                }
+
+                if (bound == EXACTBOUND || (bound == LOWERBOUND ? score >= beta : score <= alpha)) {
+                    tt.insert(board, NO_MOVE, scoreToTT(score, ply), bound, depth + TT_HIT_DEPTH_BONUS);
+                    return score;
+                }
+
+                if (is_pv) {
+                    if (bound == LOWERBOUND) {
+                        best_score = score;
+                        alpha = std::max(alpha, score);
+                    } else {
+                        max_score = score;
+                    }
+                }
+            }
+        }
+    }
+
     bool in_check = board.inCheck();
     if (in_check) {
         depth++; // check extension
@@ -391,7 +441,6 @@ int search(
     }
 
     int original_alpha = alpha;
-    int best_score = -SCORE_MAX;
     Move best_move = NO_MOVE;
 
     // PVS
@@ -416,7 +465,7 @@ int search(
 
         // MultiPV: skip root moves already claimed by an earlier, better-scoring PV slot.
         if constexpr (Type == ROOT_NODE) {
-            if (rml.is_claimed(move)) {
+            if (rml.is_claimed(move) || !rml.is_allowed(move)) {
                 continue;
             }
         }
@@ -550,6 +599,10 @@ int search(
         return in_check ? -SCORE_MAX + ply : 0; // checkmate or stalemate
     }
 
+    if (is_pv) {
+        best_score = std::min(max_score, best_score);
+    }
+
     // If only the excluded move was available, fail low (move is singular)
     if (ss->excluded != NO_MOVE && best_score == -SCORE_MAX) {
         return alpha;
@@ -567,6 +620,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     Move best_move = NO_MOVE;
     PVLine pv_table[MAX_PLY + 1]; // pre-allocated, indexed by ply
     nodes = 0;
+    tb_hits = 0;
     best_score = 0;
 
     // Setup search stack. Pad the front by 4 so continuation history can read
@@ -616,8 +670,50 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     MoveList legal_probe;
     getLegalMoves(board, legal_probe);
 
+    // Run a DTZ probe to filter the root moves by
+    rml.clear_filter();
+    if (TB_LARGEST > 0 && bitCount(board.getOcc(BOTH)) <= std::min<int>(syz_probe_limit, TB_LARGEST) && !board.getCastlingRights()) {
+        TbRootMoves tb_roots;
+        bool has_repeated = hasRepeated(board);
+        if (board.probeDTZ(tb_roots, has_repeated) && tb_roots.size > 0) {
+            int best_rank = tb_roots.moves[0].tbRank;
+            for (uint16_t i = 1; i < tb_roots.size; i++) {
+                best_rank = std::max(best_rank, tb_roots.moves[i].tbRank);
+            }
+            for (uint16_t i = 0; i < tb_roots.size; i++) {
+                if (tb_roots.moves[i].tbRank != best_rank) {
+                    continue;
+                }
+                PyrrhicMove move = tb_roots.moves[i].move;
+                Square from = static_cast<Square>(flipRank(PYRRHIC_MOVE_FROM(move)));
+                Square to = static_cast<Square>(flipRank(PYRRHIC_MOVE_TO(move)));
+                uint16_t flags = PYRRHIC_MOVE_FLAGS(move);
+                bool is_promo = flags >= PYRRHIC_FLAG_QPROMO && flags <= PYRRHIC_FLAG_NPROMO;
+                DefaultPiece promo = flags == PYRRHIC_FLAG_QPROMO ? QUEEN
+                               : flags == PYRRHIC_FLAG_RPROMO ? ROOK
+                               : flags == PYRRHIC_FLAG_BPROMO ? BISHOP : KNIGHT;
+                for (Move m : legal_probe) {
+                    if (From(m) != from || To(m) != to) {
+                        continue;
+                    }
+                    if (Prom(m) != is_promo) {
+                        continue;
+                    }
+                    if (is_promo && promPiece(m) != promo) {
+                        continue;
+                    }
+                    rml.allow(m);
+                }
+            }
+        }
+    }
+
     // Number of PV lines to report this search (at most the max number of legal moves at root)
     int pv_count = std::max(1, std::min(multi_pv, (int)legal_probe.size()));
+    if (rml.filter_size() > 0) {
+        pv_count = std::max(1, std::min(pv_count, (int)rml.filter_size()));
+    }
+
     std::vector<PVLine> multipv_pv(pv_count);
     std::vector<int> multipv_score(pv_count, 0);
     std::vector<Move> multipv_move(pv_count, NO_MOVE);

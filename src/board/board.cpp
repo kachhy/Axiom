@@ -361,10 +361,32 @@ void Board::accumulatorPropagate() const { // Update the top accumulator by walk
     while (clean > 0 && accumulator_stack[clean].accumulator_dirty) {
         clean--;
     }
-    
+
     for (int k = clean + 1; k <= acc_ply; k++) { // note: <= acc_ply (compute target too)
         accumulator_stack[k].applyDelta(accumulator_stack[k - 1]);
     }
+}
+
+static inline BitBoard mirrorRanks(BitBoard bb) { return __builtin_bswap64(bb); }
+
+uint64_t Board::probeWDL() {
+    return tb_probe_wdl(
+        mirrorRanks(occ[WHITE]), mirrorRanks(occ[BLACK]), mirrorRanks(piece_bb[WHITE_KING] | piece_bb[BLACK_KING]),
+        mirrorRanks(piece_bb[WHITE_QUEEN] | piece_bb[BLACK_QUEEN]), mirrorRanks(piece_bb[WHITE_ROOK] | piece_bb[BLACK_ROOK]),
+        mirrorRanks(piece_bb[WHITE_BISHOP] | piece_bb[BLACK_BISHOP]), mirrorRanks(piece_bb[WHITE_KNIGHT] | piece_bb[BLACK_KNIGHT]),
+        mirrorRanks(piece_bb[WHITE_PAWN] | piece_bb[BLACK_PAWN]), ep_square == NO_SQUARE ? 0 : (ep_square ^ 56), stm == WHITE ? PYRRHIC_WHITE : PYRRHIC_BLACK
+    );
+}
+
+bool Board::probeDTZ(TbRootMoves& results, bool has_repeated) { // Meant to be used at the root node only
+    return tb_probe_root_dtz(
+        mirrorRanks(occ[WHITE]), mirrorRanks(occ[BLACK]), mirrorRanks(piece_bb[WHITE_KING] | piece_bb[BLACK_KING]),
+        mirrorRanks(piece_bb[WHITE_QUEEN] | piece_bb[BLACK_QUEEN]), mirrorRanks(piece_bb[WHITE_ROOK] | piece_bb[BLACK_ROOK]),
+        mirrorRanks(piece_bb[WHITE_BISHOP] | piece_bb[BLACK_BISHOP]), mirrorRanks(piece_bb[WHITE_KNIGHT] | piece_bb[BLACK_KNIGHT]),
+        mirrorRanks(piece_bb[WHITE_PAWN] | piece_bb[BLACK_PAWN]),
+        fmr, ep_square == NO_SQUARE ? 0 : (ep_square ^ 56),
+        stm == WHITE ? PYRRHIC_WHITE : PYRRHIC_BLACK, has_repeated, &results
+    ) != 0;
 }
 
 void Board::makeMove(Move move) {

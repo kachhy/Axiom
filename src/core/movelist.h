@@ -131,6 +131,9 @@ class RootMoveList : public MoveList {
 private:
     Move claimed_moves[MAX_MOVES];
     uint8_t claimed_count = 0;
+    Move allowed_moves[MAX_MOVES];
+    uint8_t allowed_count = 0;
+    bool filtering = false;
 public:
     inline void claim(const Move move) {
         claimed_moves[claimed_count++] = move;
@@ -148,6 +151,32 @@ public:
     // Call once per depth, before searching for pv_idx 0.
     inline void reset_claims() {
         claimed_count = 0;
+    }
+
+    inline void allow(const Move move) {
+        allowed_moves[allowed_count++] = move;
+        filtering = true;
+    }
+
+    inline bool is_allowed(const Move move) const {
+        if (!filtering) {
+            return true;
+        }
+        for (uint8_t i = 0; i < allowed_count; i++) {
+            if (allowed_moves[i] == move) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline uint8_t filter_size() const {
+        return filtering ? allowed_count : 0;
+    }
+
+    inline void clear_filter() {
+        allowed_count = 0;
+        filtering = false;
     }
 };
 
