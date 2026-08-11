@@ -229,8 +229,8 @@ static inline void go(Board& board) {
     for (uint8_t i = 0; i < num_threads - 1; i++) {
         GoParams helper_params = params;
         helper_params.silent = true;
-        helper_params.aspiration_jitter = i % 16;
-        helper_params.start_depth_offset = i % 8;
+        helper_params.aspiration_jitter = (i + 1) % 16;
+        helper_params.start_depth_offset = (i + 1) % 8;
 
         helpers.emplace_back([&, i, helper_params] {
             stdin_enabled = false; // only the main thread may touch std::cin
