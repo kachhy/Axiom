@@ -621,6 +621,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     std::vector<PVLine> multipv_pv(pv_count);
     std::vector<int> multipv_score(pv_count, 0);
     std::vector<Move> multipv_move(pv_count, NO_MOVE);
+    bool has_completed_iteration = false;
 
     for (int depth = 1 + params.start_depth_offset; depth <= max_depth; depth++) {
         if (!searching) {
@@ -638,7 +639,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
             int alpha;
             int beta;
 
-            if (pv_idx == 0 && depth >= ASPIRATION_DEPTH_CUTOFF) {
+            if (pv_idx == 0 && depth >= ASPIRATION_DEPTH_CUTOFF && has_completed_iteration) {
                 alpha = best_score - delta;
                 beta = best_score + delta;
             } else {
@@ -694,6 +695,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
                     if (pv_idx == 0) {
                         best_score = iter_score;
                         best_move = multipv_move[0];
+                        has_completed_iteration = true;
                     }
                     break;
                 }
