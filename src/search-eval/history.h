@@ -5,7 +5,7 @@
 #include "core/movelist.h"
 #include "core/types.h"
 
-constexpr int MAX_HISTORY = 8192;
+constexpr int MAX_HISTORY = 16384;
 
 extern int score_history[2][64][64]; // [stm][from][to] (butterfly history)
 extern int cont_hist[2][6][64][6][64]; // [stm][prevPiece][prevTo][piece][to] (continuation history)
