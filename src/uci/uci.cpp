@@ -127,6 +127,7 @@ static inline void initOptions() {
 
     setOption("SyzygyProbeDepth", SpinOption{ 1, 100, 1, [](int spd) { syz_probe_depth = spd; } });
     setOption("Syzygy50MoveRule", CheckOption{ true, [](bool sfmr) { syz_fmr = sfmr; } });
+    setOption("SyzygyRootDTZProbe", CheckOption{ true, [](bool sdtz) { syz_dtz = sdtz; } });
     setOption("SyzygyProbeLimit", SpinOption{ 0, 7, 7, [](int spl) { syz_probe_limit = spl; } });
 
     setOption("EvalFile", StringOption{ "nn-0d2fd98ff872a9a1-v2.nnue", [](std::string path) {

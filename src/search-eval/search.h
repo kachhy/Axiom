@@ -33,6 +33,7 @@ extern int multi_pv;
 extern short syz_probe_depth;
 extern short syz_probe_limit;
 extern bool syz_fmr;
+extern bool syz_dtz;
 
 struct GoParams;
 
