@@ -353,12 +353,12 @@ int search(
     int static_eval = ss->static_eval;
 
     // imrpoving checks
-    bool improving = !in_check && ply >= 2 && static_eval > (ss - 2)->static_eval;
+    // bool improving = !in_check && ply >= 2 && static_eval > (ss - 2)->static_eval;
 
     if constexpr (Type != ROOT_NODE) {
         // rfp (prune worse positions harder with improving position)
         // TODO Tune the rfp margin constant
-        if (!is_pv && !in_check && depth <= 6 && static_eval - RFP_MARGIN * (depth - (improving && depth > 1)) >= beta) {
+        if (!is_pv && !in_check && depth <= 6 && static_eval - RFP_MARGIN * (depth/* - (improving && depth > 1)*/) >= beta) {
             return static_eval;
         }
 
@@ -539,7 +539,7 @@ int search(
             if (moves_searched >= LMR_MOVES_CUTOFF && depth >= LMR_DEPTH_CUTOFF && !Capture(move) && !Prom(move) && !in_check) {
                 // TODO tune this function
                 // improving flag = search more carefully when good position is improving (less reduction)
-                int lmr_reduction = std::max(0, std::min((int)(LMR_VALUE + (log(depth)) * log(moves_searched) / LMR_SCALAR), depth - 2)  - improving);
+                int lmr_reduction = std::max(0, std::min((int)(LMR_VALUE + (log(depth)) * log(moves_searched) / LMR_SCALAR), depth - 2) /* - improving*/);
                 // history-based reduction: reduce good-history quiets less, bad-history more.
                 const int move_hist = getScoreHistory(board.getXSTM(), move) + getContHist(ss, board.getXSTM(), move);
                 lmr_reduction = std::max(0, std::min(lmr_reduction - move_hist / HIST_LMR_DIVISOR, depth - 2));
