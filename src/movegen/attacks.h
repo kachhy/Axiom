@@ -24,29 +24,11 @@ BitBoard generateKingAttacks(Square sq);
 BitBoard generateKnightAttacks(Square sq);
 
 // Getting attacks
-BitBoard getPawnAttacks(Square sq, Side side);
-BitBoard getKnightAttacks(Square sq);
-BitBoard getBishopAttacks(Square sq, BitBoard occ);
-BitBoard getRookAttacks(Square sq, BitBoard occ);
-BitBoard getQueenAttacks(Square sq, BitBoard occ);
-BitBoard getKingAttacks(Square sq);
-BitBoard getPieceAttacks(Piece piece, Square sq, BitBoard occ);
+const int bishop_relevant_bits[64] = { 6, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 7, 9, 9, 7, 5, 5,
+                                       5, 5, 7, 9, 9, 7, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 6 };
 
-// Population functions
-// For masks
-void populateRookMasks();
-void populateBishopMasks();
-
-// For attacks
-void populatePawnAttacks();
-void populateKingAttacks();
-void populateKnightAttacks();
-void populateBishopAttacks();
-void populateRookAttacks();
-
-// For between squares
-void populateBetweenSquares();
-void populateLineSquares();
+const int rook_relevant_bits[64] = { 12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
+                                     11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 12, 11, 11, 11, 11, 11, 11, 12 };
 
 // Magic numbers
 constexpr BitBoard rook_magics[64] = {
@@ -74,5 +56,57 @@ constexpr BitBoard bishop_magics[64] = {
     0x40808090012004ULL,   0x910224040218c9ULL,   0x402814422015008ULL,  0x90014004842410ULL,   0x1000042304105ULL,    0x10008830412a00ULL,   0x2520081090008908ULL,
     0x40102000a0a60140ULL,
 };
+
+inline BitBoard getPawnAttacks(Square sq, Side side) { return pawn_attacks[side][sq]; }
+inline BitBoard getKnightAttacks(Square sq) { return knight_attacks[sq]; }
+inline BitBoard getBishopAttacks(Square sq, BitBoard occ) {
+    occ &= bishop_masks[sq];
+    occ *= bishop_magics[sq];
+    occ >>= 64 - (bishop_relevant_bits[sq]);
+    return bishop_attacks[sq][occ];
+}
+
+inline BitBoard getRookAttacks(Square sq, BitBoard occ) {
+    occ &= rook_masks[sq];
+    occ *= rook_magics[sq];
+    occ >>= 64 - (rook_relevant_bits[sq]);
+    return rook_attacks[sq][occ];
+}
+
+inline BitBoard getQueenAttacks(Square sq, BitBoard occ) { return getBishopAttacks(sq, occ) | getRookAttacks(sq, occ); }
+inline BitBoard getKingAttacks(Square sq) { return king_attacks[sq]; }
+inline BitBoard getPieceAttacks(Piece piece, Square sq, BitBoard occ) {
+    switch (piece) {
+    case BLACK_KING:
+    case WHITE_KING: return getKingAttacks(sq);
+    case BLACK_QUEEN:
+    case WHITE_QUEEN: return getQueenAttacks(sq, occ);
+    case BLACK_ROOK:
+    case WHITE_ROOK: return getRookAttacks(sq, occ);
+    case BLACK_BISHOP:
+    case WHITE_BISHOP: return getBishopAttacks(sq, occ);
+    case BLACK_KNIGHT:
+    case WHITE_KNIGHT: return getKnightAttacks(sq);
+    case BLACK_PAWN: return getPawnAttacks(sq, BLACK);
+    case WHITE_PAWN: return getPawnAttacks(sq, WHITE);
+    default: return BitBoard(0);
+    }
+}
+
+// Population functions
+// For masks
+void populateRookMasks();
+void populateBishopMasks();
+
+// For attacks
+void populatePawnAttacks();
+void populateKingAttacks();
+void populateKnightAttacks();
+void populateBishopAttacks();
+void populateRookAttacks();
+
+// For between squares
+void populateBetweenSquares();
+void populateLineSquares();
 
 #endif // ATTACKS_H
