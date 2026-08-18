@@ -702,6 +702,45 @@ static inline Score kingSafety(const PieceCounts& pc, const Board& board, const 
     return score;
 }
 
+EvalInfo computeEvalInfo(const Board& board) {
+    EvalInfo info = {};
+    const BitBoard occ_both = board.getOcc(BOTH);
+    const BitBoard white_pawns = board.getPieceBB(WHITE_PAWN);
+    const BitBoard black_pawns = board.getPieceBB(BLACK_PAWN);
+
+    info.piece_attacks[WHITE_PAWN] = shiftPawnAttacks(white_pawns, WHITE);
+    info.piece_attacks[BLACK_PAWN] = shiftPawnAttacks(black_pawns, BLACK);
+
+    // Pawn double-attacks
+    info.multi_defended[WHITE] = shiftPawnCapturesWest(white_pawns, WHITE) & shiftPawnCapturesEast(white_pawns, WHITE);
+    info.multi_defended[BLACK] = shiftPawnCapturesWest(black_pawns, BLACK) & shiftPawnCapturesEast(black_pawns, BLACK);
+
+    BitBoard threatened[2] = { info.piece_attacks[WHITE_PAWN], info.piece_attacks[BLACK_PAWN] };
+    for (int white_index = WHITE_PAWN + 1, black_index = BLACK_PAWN + 1; white_index <= WHITE_KING; white_index++, black_index++) {
+        BitBoard cur_piece_bb = board.getPieceBB(static_cast<Piece>(white_index));
+        while (cur_piece_bb) {
+            Square cur_square = static_cast<Square>(popLSB(cur_piece_bb));
+            const BitBoard attacks = getPieceAttacks(static_cast<Piece>(white_index), cur_square, occ_both);
+            info.multi_defended[WHITE] |= threatened[WHITE] & attacks;
+            threatened[WHITE] |= attacks;
+            info.piece_attacks[white_index] |= attacks;
+            info.square_attacks[cur_square] = attacks;
+        }
+        
+        cur_piece_bb = board.getPieceBB(static_cast<Piece>(black_index));
+        while (cur_piece_bb) {
+            Square cur_square = static_cast<Square>(popLSB(cur_piece_bb));
+            const BitBoard attacks = getPieceAttacks(static_cast<Piece>(black_index), cur_square, occ_both);
+            info.multi_defended[BLACK] |= threatened[BLACK] & attacks;
+            threatened[BLACK] |= attacks;
+            info.piece_attacks[black_index] |= attacks;
+            info.square_attacks[cur_square] = attacks;
+        }
+    }
+
+    return info;
+}
+
 int eval(const Board& board) {
     if (isMaterialDraw(board)) {
         return 0;
@@ -713,7 +752,7 @@ int eval(const Board& board) {
         return nnue_score;
     }
 
-    EvalInfo info = board.getEvalInfo();
+    const EvalInfo info = computeEvalInfo(board);
     PieceCounts pc = getPieceCounts(board);
 #ifdef TUNING
     Score score = applyMaterial(pc);

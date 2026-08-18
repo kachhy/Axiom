@@ -399,8 +399,7 @@ void Board::makeMove(Move move) {
     accumulator_stack[acc_ply].record(move, stm, captured, static_cast<uint8_t>(getLSB(piece_bb[WHITE_KING])), static_cast<uint8_t>(getLSB(piece_bb[BLACK_KING])));
 
     history[history_ply++] = BoardHistory(
-        castling, ep_square, fmr, captured, checkers, legal_mask, threatened_by[WHITE], threatened_by[BLACK], pinned, zobrist_hash, pawn_hash, material_pst_score,
-        eval_info
+        castling, ep_square, fmr, captured, checkers, legal_mask, threatened_by[WHITE], threatened_by[BLACK], pinned, zobrist_hash, pawn_hash, material_pst_score
     );
 
     fmr++;
@@ -592,7 +591,6 @@ void Board::undoMove(Move move) {
     zobrist_hash = hist_data.zobrist_hash;
     pawn_hash = hist_data.pawn_hash;
     material_pst_score = hist_data.material_pst_score;
-    memcpy(&eval_info, &hist_data.eval_info, sizeof(EvalInfo));
     acc_ply--;
 
     std::swap(stm, xstm);
@@ -685,8 +683,7 @@ void Board::makeNullMove() {
     accumulator_stack[acc_ply].record(NO_MOVE, stm, NO_PIECE, static_cast<uint8_t>(getLSB(piece_bb[WHITE_KING])), static_cast<uint8_t>(getLSB(piece_bb[BLACK_KING])));
 
     history[history_ply++] = BoardHistory(
-        castling, ep_square, fmr, NO_PIECE, checkers, legal_mask, threatened_by[WHITE], threatened_by[BLACK], pinned, zobrist_hash, pawn_hash, material_pst_score,
-        eval_info
+        castling, ep_square, fmr, NO_PIECE, checkers, legal_mask, threatened_by[WHITE], threatened_by[BLACK], pinned, zobrist_hash, pawn_hash, material_pst_score
     );
     if (ep_square != NO_SQUARE) {
         zobrist_hash ^= ep_keys[ep_square];
@@ -711,7 +708,6 @@ void Board::undoNullMove() {
     zobrist_hash = hist_data.zobrist_hash;
     pawn_hash = hist_data.pawn_hash;
     material_pst_score = hist_data.material_pst_score;
-    memcpy(&eval_info, &hist_data.eval_info, sizeof(EvalInfo));
     acc_ply--;
     std::swap(stm, xstm);
 }
@@ -806,37 +802,20 @@ void Board::refreshMaterialPST() {
 }
 
 void Board::setThreatened() {
-    threatened_by[WHITE] = BitBoard(0);
-    threatened_by[BLACK] = BitBoard(0);
-    eval_info.piece_attacks[WHITE_PAWN] = shiftPawnAttacks(piece_bb[WHITE_PAWN], WHITE);
-    eval_info.piece_attacks[BLACK_PAWN] = shiftPawnAttacks(piece_bb[BLACK_PAWN], BLACK);
+    threatened_by[WHITE] = shiftPawnAttacks(piece_bb[WHITE_PAWN], WHITE);
+    threatened_by[BLACK] = shiftPawnAttacks(piece_bb[BLACK_PAWN], BLACK);
 
-    // Pawn double-attacks: both diagonals must overlap
-    eval_info.multi_defended[WHITE] = shiftPawnCapturesWest(piece_bb[WHITE_PAWN], WHITE) & shiftPawnCapturesEast(piece_bb[WHITE_PAWN], WHITE);
-    eval_info.multi_defended[BLACK] = shiftPawnCapturesWest(piece_bb[BLACK_PAWN], BLACK) & shiftPawnCapturesEast(piece_bb[BLACK_PAWN], BLACK);
-
-    threatened_by[WHITE] |= eval_info.piece_attacks[WHITE_PAWN];
-    threatened_by[BLACK] |= eval_info.piece_attacks[BLACK_PAWN];
     for (int white_index = WHITE_PAWN + 1, black_index = BLACK_PAWN + 1; white_index <= WHITE_KING; white_index++, black_index++) {
-        eval_info.piece_attacks[white_index] = BitBoard(0);
-        eval_info.piece_attacks[black_index] = BitBoard(0);
         BitBoard cur_piece_bb = piece_bb[white_index];
         while (cur_piece_bb) {
             Square cur_square = static_cast<Square>(popLSB(cur_piece_bb));
-            const BitBoard attacks = getPieceAttacks(static_cast<Piece>(white_index), cur_square, occ[BOTH]);
-            eval_info.multi_defended[WHITE] |= threatened_by[WHITE] & attacks;
-            threatened_by[WHITE] |= attacks;
-            eval_info.piece_attacks[white_index] |= attacks;
-            eval_info.square_attacks[cur_square] = attacks;
+            threatened_by[WHITE] |= getPieceAttacks(static_cast<Piece>(white_index), cur_square, occ[BOTH]);
         }
+        
         cur_piece_bb = piece_bb[black_index];
         while (cur_piece_bb) {
             Square cur_square = static_cast<Square>(popLSB(cur_piece_bb));
-            const BitBoard attacks = getPieceAttacks(static_cast<Piece>(black_index), cur_square, occ[BOTH]);
-            eval_info.multi_defended[BLACK] |= threatened_by[BLACK] & attacks;
-            threatened_by[BLACK] |= attacks;
-            eval_info.piece_attacks[black_index] |= attacks;
-            eval_info.square_attacks[cur_square] = attacks;
+            threatened_by[BLACK] |= getPieceAttacks(static_cast<Piece>(black_index), cur_square, occ[BOTH]);
         }
     }
 }

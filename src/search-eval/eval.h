@@ -6,6 +6,14 @@
 constexpr int SCORE_MAX = 32000;
 constexpr int TB_WIN_SCORE = SCORE_MAX - MAX_GAME_MOVES - MAX_PLY - 1;
 
+struct EvalInfo {
+    BitBoard piece_attacks[12];
+    BitBoard square_attacks[64];
+    BitBoard multi_defended[2];
+};
+
+EvalInfo computeEvalInfo(const Board& board);
+
 // TODO: Move these to consteval for C++20
 #ifdef TUNING
 #define TRACE_ADD(term, side, val) (trace.term[side] += (val))
