@@ -658,28 +658,32 @@ static inline std::pair<size_t, size_t> timeManagement(const Board& board, const
     return std::make_pair(hard_cap, soft_cap);
 }
 
-static inline bool shouldStopSoft(size_t soft_cap, size_t hard_cap, size_t elapsed,
+constexpr int STABILITY_MIN_DEPTH = 8;
+
+static inline bool shouldStopSoft(size_t soft_cap, size_t hard_cap, size_t elapsed, int depth,
                                   uint8_t consec_stable_iterations, bool best_move_matches_this_turn,
                                   int abs_score_delta) {
     float stability = 1;
     float score_factor = 1;
 
-    if (best_move_matches_this_turn) {
-        stability = std::max(0.5, 1.0 - 0.05 * consec_stable_iterations);
-    } else {
-        stability = 1.3;
-    }
+    if (depth >= STABILITY_MIN_DEPTH) {
+        if (best_move_matches_this_turn) {
+            stability = std::max(0.5, 1.0 - 0.05 * consec_stable_iterations);
+        } else {
+            stability = 1.3;
+        }
 
-    if (abs_score_delta > 50) {
-        score_factor = 1.5;
-    } else if (abs_score_delta > 20) {
-        score_factor = 1.15;
-    } else {
-        score_factor = 0.9;
+        if (abs_score_delta > 50) {
+            score_factor = 1.5;
+        } else if (abs_score_delta > 20) {
+            score_factor = 1.15;
+        } else {
+            score_factor = 0.9;
+        }
     }
 
     float target_time = soft_cap * stability * score_factor;
-    target_time = std::min(static_cast<size_t>(target_time), hard_cap);
+    target_time = std::min(static_cast<size_t>(target_time), (hard_cap * 3) / 4);
 
     return elapsed > target_time;
 }
@@ -876,7 +880,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
         size_t elapsed = (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
         if (soft_cap != 0
             && elapsed >= soft_cap
-            && shouldStopSoft(soft_cap, hard_cap, elapsed, consec_stable_iterations, best_move == prev_best_move, abs(best_score - prev_score))) {
+            && shouldStopSoft(soft_cap, hard_cap, elapsed, depth, consec_stable_iterations, best_move == prev_best_move, abs(best_score - prev_score))) {
             break;
         }
     }
