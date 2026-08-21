@@ -24,6 +24,7 @@ thread_local uint16_t seldepth;
 thread_local uint64_t nodes;
 thread_local uint64_t tb_hits;
 int multi_pv = 1;
+int move_overhead = 20;
 short syz_probe_depth = 1;
 short syz_probe_limit = 7;
 bool syz_fmr = true;
@@ -617,6 +618,72 @@ int search(
     return best_score;
 }
 
+static inline std::pair<size_t, size_t> timeManagement(const Board& board, const GoParams& params) {
+    size_t hard_cap, soft_cap;
+
+    int wtime_adj = (params.wtime > static_cast<int>(move_overhead)) ? params.wtime - move_overhead : 1;
+    int btime_adj = (params.btime > static_cast<int>(move_overhead)) ? params.btime - move_overhead : 1;
+
+    if (params.movetime != -1) {
+        hard_cap = std::max(params.movetime, 1);
+        soft_cap = params.movetime;
+    } else if (board.getSTM() == WHITE) {
+        if (params.wtime == -1) {
+            hard_cap = 0;
+            soft_cap = 0;
+        } else {
+            if (params.movestogo > 0) {
+                hard_cap = std::max(wtime_adj / params.movestogo + params.winc, 1);
+                soft_cap = wtime_adj / params.movestogo + params.winc;
+            } else {
+                hard_cap = std::max(wtime_adj / 20 + params.winc / 2, 1);
+                soft_cap = wtime_adj / 30 + params.winc / 3;
+            }
+        }
+    } else {
+        if (params.btime == -1) {
+            hard_cap = 0;
+            soft_cap = 0;
+        } else {
+            if (params.movestogo > 0) {
+                hard_cap = std::max(btime_adj / params.movestogo + params.binc, 1);
+                soft_cap = btime_adj / params.movestogo + params.binc;
+            } else {
+                hard_cap = std::max(btime_adj / 20 + params.binc / 2, 1);
+                soft_cap = btime_adj / 30 + params.binc / 3;
+            }
+        }
+    }
+
+    return std::make_pair(hard_cap, soft_cap);
+}
+
+static inline bool shouldStopSoft(size_t soft_cap, size_t hard_cap, size_t elapsed,
+                                  uint8_t consec_stable_iterations, bool best_move_matches_this_turn,
+                                  int abs_score_delta) {
+    float stability = 1;
+    float score_factor = 1;
+
+    if (best_move_matches_this_turn) {
+        stability = std::max(0.5, 1.0 - 0.05 * consec_stable_iterations);
+    } else {
+        stability = 1.3;
+    }
+
+    if (abs_score_delta > 50) {
+        score_factor = 1.5;
+    } else if (abs_score_delta > 20) {
+        score_factor = 1.15;
+    } else {
+        score_factor = 0.9;
+    }
+
+    float target_time = soft_cap * stability * score_factor;
+    target_time = std::min(static_cast<size_t>(target_time), hard_cap);
+
+    return elapsed > target_time;
+}
+
 Move search(Board& board, int max_depth, int& best_score, const GoParams& params) {
     Move best_move = NO_MOVE;
     PVLine pv_table[MAX_PLY + 1]; // pre-allocated, indexed by ply
@@ -633,38 +700,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     resetHistory();
 
     auto start = std::chrono::high_resolution_clock::now();
-    size_t hard_cap, soft_cap;
-
-    if (params.movetime != -1) {
-        hard_cap = std::max(params.movetime, 1);
-        soft_cap = params.movetime;
-    } else if (board.getSTM() == WHITE) {
-        if (params.wtime == -1) {
-            hard_cap = 0;
-            soft_cap = 0;
-        } else {
-            if (params.movestogo > 0) {
-                hard_cap = std::max(params.wtime / params.movestogo + params.winc, 1);
-                soft_cap = params.wtime / params.movestogo + params.winc;
-            } else {
-                hard_cap = std::max(params.wtime / 20 + params.winc / 2, 1);
-                soft_cap = params.wtime / 30 + params.winc / 3;
-            }
-        }
-    } else {
-        if (params.btime == -1) {
-            hard_cap = 0;
-            soft_cap = 0;
-        } else {
-            if (params.movestogo > 0) {
-                hard_cap = std::max(params.btime / params.movestogo + params.binc, 1);
-                soft_cap = params.btime / params.movestogo + params.binc;
-            } else {
-                hard_cap = std::max(params.btime / 20 + params.binc / 2, 1);
-                soft_cap = params.btime / 30 + params.binc / 3;
-            }
-        }
-    }
+    auto [hard_cap, soft_cap] = timeManagement(board, params);
 
     // rml is (re)populated fresh inside root search on every call
     RootMoveList rml;
@@ -718,6 +754,10 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     std::vector<PVLine> multipv_pv(pv_count);
     std::vector<int> multipv_score(pv_count, 0);
     std::vector<Move> multipv_move(pv_count, NO_MOVE);
+    
+    uint16_t consec_stable_iterations = 0;
+    int prev_score = SCORE_MAX + 1;
+    Move prev_best_move = NO_MOVE;
 
     for (int depth = 1; depth <= max_depth; depth++) {
         if (!searching) {
@@ -790,7 +830,16 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
                     rml.claim(multipv_move[pv_idx]);
 
                     if (pv_idx == 0) {
+                        prev_score = best_score;
                         best_score = iter_score;
+
+                        if (best_move == multipv_move[0]) {
+                            consec_stable_iterations++;
+                        } else {
+                            consec_stable_iterations = 0;
+                        }
+
+                        prev_best_move = best_move;
                         best_move = multipv_move[0];
                     }
                     break;
@@ -824,7 +873,10 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
             }
         }
 
-        if (soft_cap != 0 && (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count() >= soft_cap) {
+        size_t elapsed = (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+        if (soft_cap != 0
+            && elapsed >= soft_cap
+            && shouldStopSoft(soft_cap, hard_cap, elapsed, consec_stable_iterations, best_move == prev_best_move, abs(best_score - prev_score))) {
             break;
         }
     }

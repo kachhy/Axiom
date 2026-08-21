@@ -30,6 +30,7 @@ constexpr uint8_t TT_HIT_DEPTH_BONUS = 6;
 extern thread_local uint64_t nodes;
 extern thread_local uint64_t tb_hits;
 extern int multi_pv;
+extern int move_overhead;
 extern short syz_probe_depth;
 extern short syz_probe_limit;
 extern bool syz_fmr;
