@@ -14,12 +14,6 @@ BitBoard king_attacks[64];
 BitBoard between_squares[64][64];
 BitBoard line_squares[64][64];
 
-const int bishop_relevant_bits[64] = { 6, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 7, 9, 9, 7, 5, 5,
-                                       5, 5, 7, 9, 9, 7, 5, 5, 5, 5, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 5, 5, 5, 5, 5, 5, 6 };
-
-const int rook_relevant_bits[64] = { 12, 11, 11, 11, 11, 11, 11, 12, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11,
-                                     11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 11, 10, 10, 10, 10, 10, 10, 11, 12, 11, 11, 11, 11, 11, 11, 12 };
-
 BitBoard getAttackers(const Board& board, Square sq, BitBoard occ) {
     BitBoard diagonal_attacks = getBishopAttacks(sq, occ);
     BitBoard orthogonal_attacks = getRookAttacks(sq, occ);
@@ -98,28 +92,6 @@ BitBoard generateKnightAttacks(Square sq) {
 
     return attacks;
 }
-
-BitBoard getPawnAttacks(Square sq, Side side) { return pawn_attacks[side][sq]; }
-
-BitBoard getKnightAttacks(Square sq) { return knight_attacks[sq]; }
-
-BitBoard getBishopAttacks(Square sq, BitBoard occ) {
-    occ &= bishop_masks[sq];
-    occ *= bishop_magics[sq];
-    occ >>= 64 - (bishop_relevant_bits[sq]);
-    return bishop_attacks[sq][occ];
-}
-
-BitBoard getRookAttacks(Square sq, BitBoard occ) {
-    occ &= rook_masks[sq];
-    occ *= rook_magics[sq];
-    occ >>= 64 - (rook_relevant_bits[sq]);
-    return rook_attacks[sq][occ];
-}
-
-BitBoard getQueenAttacks(Square sq, BitBoard occ) { return getBishopAttacks(sq, occ) | getRookAttacks(sq, occ); }
-
-BitBoard getKingAttacks(Square sq) { return king_attacks[sq]; }
 
 BitBoard getRookMask(Square sq) {
     BitBoard attacks = BitBoard(0);
@@ -409,23 +381,5 @@ void populateLineSquares() {
         for (uint8_t to = 0; to < from; to++) {
             line_squares[from][to] = line_squares[to][from];
         }
-    }
-}
-
-BitBoard getPieceAttacks(Piece piece, Square sq, BitBoard occ) {
-    switch (piece) {
-    case BLACK_KING:
-    case WHITE_KING: return getKingAttacks(sq);
-    case BLACK_QUEEN:
-    case WHITE_QUEEN: return getQueenAttacks(sq, occ);
-    case BLACK_ROOK:
-    case WHITE_ROOK: return getRookAttacks(sq, occ);
-    case BLACK_BISHOP:
-    case WHITE_BISHOP: return getBishopAttacks(sq, occ);
-    case BLACK_KNIGHT:
-    case WHITE_KNIGHT: return getKnightAttacks(sq);
-    case BLACK_PAWN: return getPawnAttacks(sq, BLACK);
-    case WHITE_PAWN: return getPawnAttacks(sq, WHITE);
-    default: return BitBoard(0);
     }
 }
