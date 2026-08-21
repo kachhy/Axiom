@@ -2,6 +2,7 @@
 #include "hash/transposition.h"
 #include "nnue/nnue.h"
 #include "search-eval/eval.h"
+#include "search-eval/history.h"
 #include "search-eval/search.h"
 #include "syzygy/tbprobe.h"
 #include <sstream>
@@ -106,6 +107,12 @@ static inline void changeOptions() { applySetOption(parseSetOption(std::cin)); }
 
 // called when a new game is started, resets the bot to its original state
 static inline void newGame(Board& board) {
+    // Reset history
+    resetHistory();
+
+    // Clear TT
+    tt.clear();
+
     // reset the board to the starting position
     board.clear();
     board.loadFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -300,7 +307,6 @@ void uci() {
             position(board);
         } else if (buffer == "ucinewgame") {
             newGame(board);
-            tt.clear();
         } else if (buffer == "isready") {
             std::cout << "readyok\n";
         } else if (buffer == "quit") {
