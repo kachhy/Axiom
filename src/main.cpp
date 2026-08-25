@@ -46,6 +46,9 @@ int main(int argc, char** argv) {
     // Populate eval data
     initEval();
 
+    // Populate LMR reduction table
+    initLMR();
+
 #ifdef TUNING
     if (argc < 5) {
         std::cerr << "Usage: " << argv[0] << " <Tuning dataset> <Position limit> <Epochs> <Output file> [Perturb = 0] [Threads = 1]" << std::endl;

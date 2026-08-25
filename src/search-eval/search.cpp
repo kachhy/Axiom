@@ -29,6 +29,16 @@ short syz_probe_limit = 7;
 bool syz_fmr = true;
 bool syz_dtz = true;
 
+int LMR_TABLE[LMR_TABLE_SIZE][LMR_TABLE_SIZE];
+
+void initLMR() {
+    for (int depth = 1; depth < LMR_TABLE_SIZE; depth++) {
+        for (int played = 1; played < LMR_TABLE_SIZE; played++) {
+            LMR_TABLE[depth][played] = static_cast<int>(LMR_VALUE + log(depth) * log(played) / LMR_SCALAR);
+        }
+    }
+}
+
 struct PVLine {
     uint16_t cur_move;
     Move moves[256];
@@ -225,7 +235,7 @@ static int scoreMove(Board& board, Move move, Move tt_move, SearchStack* ss) {
 
 template <NodeType Type>
 int search(
-    Board& board, int depth, int alpha, int beta, size_t hard_cap, long long max_nodes, std::chrono::high_resolution_clock::time_point start, int ply, SearchStack* ss,
+    Board& board, int depth, int alpha, int beta, bool cutnode, size_t hard_cap, long long max_nodes, std::chrono::high_resolution_clock::time_point start, int ply, SearchStack* ss,
     bool can_make_null_move, PVLine pv_table[], int max_ply, RootMoveList& rml
 ) {
     if (ply >= seldepth) {
@@ -371,7 +381,7 @@ int search(
             board.makeNullMove();
             tt.prefetch(board.hash());
             int score =
-                -search<NON_ROOT_NODE>(board, depth - 1 - nmp_reduction, -beta, -beta + 1, hard_cap, max_nodes, start, ply + 1, ss + 1, false, pv_table, max_ply, rml);
+                -search<NON_ROOT_NODE>(board, depth - 1 - nmp_reduction, -beta, -beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, false, pv_table, max_ply, rml);
             board.undoNullMove();
 
             if (score >= SCORE_MAX - MAX_GAME_MOVES) { // Prevent including mate scores
@@ -415,7 +425,7 @@ int search(
 
                 int score = -quiesce(board, -prob_beta, -prob_beta + 1, ply + 1, 0);
                 if (score >= prob_beta) {
-                    score = -search<NON_ROOT_NODE>(board, depth - 4, -prob_beta, -prob_beta + 1, hard_cap, max_nodes, start, ply + 1, ss, true, pv_table, max_ply, rml);
+                    score = -search<NON_ROOT_NODE>(board, depth - 4, -prob_beta, -prob_beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss, true, pv_table, max_ply, rml);
                     board.undoMove(move);
 
                     if (score >= prob_beta) {
@@ -506,7 +516,7 @@ int search(
 
                 ss->excluded = move;
                 int s_score =
-                    search<NON_ROOT_NODE>(board, (depth - 1) / 2, s_beta - 1, s_beta, hard_cap, max_nodes, start, ply, ss, can_make_null_move, pv_table, max_ply, rml);
+                    search<NON_ROOT_NODE>(board, (depth - 1) / 2, s_beta - 1, s_beta, cutnode, hard_cap, max_nodes, start, ply, ss, can_make_null_move, pv_table, max_ply, rml);
                 ss->excluded = NO_MOVE;
 
                 pv_table[ply] = saved_pv;
@@ -533,29 +543,58 @@ int search(
         bool do_full_search = false;
 
         if (moves_searched == 0) {
-            score = -search<NON_ROOT_NODE>(board, new_depth, -beta, -alpha, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
+            // the principal child of a pv node is itself a pv node, never a cut node
+            score = -search<NON_ROOT_NODE>(
+                board, new_depth, -beta, -alpha, is_pv ? false : !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml
+            );
         } else {
             // lmr
             if (moves_searched >= LMR_MOVES_CUTOFF && depth >= LMR_DEPTH_CUTOFF && !Capture(move) && !Prom(move) && !in_check) {
-                // TODO tune this function
                 // improving flag = search more carefully when good position is improving (less reduction)
-                int lmr_reduction = std::max(0, std::min((int)(LMR_VALUE + (log(depth)) * log(moves_searched) / LMR_SCALAR), depth - 2)  - improving);
+                int lmr_reduction = std::max(
+                    0, std::min(LMR_TABLE[std::min(depth, LMR_TABLE_SIZE - 1)][std::min(moves_searched, LMR_TABLE_SIZE - 1)], depth - 2)
+                );
+                
                 // history-based reduction: reduce good-history quiets less, bad-history more.
                 const int move_hist = getScoreHistory(board.getXSTM(), move) + getContHist(ss, board.getXSTM(), move);
-                lmr_reduction = std::max(0, std::min(lmr_reduction - move_hist / HIST_LMR_DIVISOR, depth - 2));
-                score = -search<NON_ROOT_NODE>(
-                    board, new_depth - lmr_reduction, -alpha - 1, -alpha, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml
-                );
-                do_full_search = score > alpha;
+                lmr_reduction -= move_hist / HIST_LMR_DIVISOR;
+                lmr_reduction = std::max(0, lmr_reduction);
+
+                if (tt_hit && (Capture(tt_entry.best_move) || Prom(tt_entry.best_move))) {
+                    lmr_reduction++;
+                }
+
+                if (improving) {
+                    lmr_reduction--;
+                }
+
+                if (cutnode) {
+                    lmr_reduction += LMR_CUTNODE;
+                }
+
+                if (!tt_hit && !is_pv) {
+                    lmr_reduction++;
+                }
+
+                lmr_reduction = std::max(0, std::min(lmr_reduction, new_depth - 1));
+
+                if (lmr_reduction > 0) {
+                    score = -search<NON_ROOT_NODE>(
+                        board, new_depth - lmr_reduction, -alpha - 1, -alpha, true, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml
+                    );
+                    do_full_search = score > alpha;
+                } else {
+                    do_full_search = true;
+                }
             } else {
                 do_full_search = true;
             }
 
             // pvs at full depth
             if (do_full_search) {
-                score = -search<NON_ROOT_NODE>(board, new_depth, -alpha - 1, -alpha, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
+                score = -search<NON_ROOT_NODE>(board, new_depth, -alpha - 1, -alpha, !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
                 if (score > alpha && score < beta) {
-                    score = -search<NON_ROOT_NODE>(board, new_depth, -beta, -alpha, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
+                    score = -search<NON_ROOT_NODE>(board, new_depth, -beta, -alpha, false, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
                 }
             }
         }
@@ -751,7 +790,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
                     pv_table[i].cur_move = 0;
                 }
 
-                iter_score = search<ROOT_NODE>(board, depth, alpha, beta, hard_cap, params.nodes, start, 0, sstack, true, pv_table, MAX_PLY, rml);
+                iter_score = search<ROOT_NODE>(board, depth, alpha, beta, false, hard_cap, params.nodes, start, 0, sstack, true, pv_table, MAX_PLY, rml);
                 if (!searching) {
                     aborted = true;
                     break;
