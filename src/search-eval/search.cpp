@@ -425,7 +425,7 @@ int search(
 
                 int score = -quiesce(board, -prob_beta, -prob_beta + 1, ply + 1, 0);
                 if (score >= prob_beta) {
-                    score = -search<NON_ROOT_NODE>(board, depth - 4, -prob_beta, -prob_beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss, true, pv_table, max_ply, rml);
+                    score = -search<NON_ROOT_NODE>(board, depth - 4, -prob_beta, -prob_beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
                     board.undoMove(move);
 
                     if (score >= prob_beta) {
