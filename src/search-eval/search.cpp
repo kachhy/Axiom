@@ -130,16 +130,21 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
     if (ply >= seldepth) {
         seldepth = ply;
     }
+
     nodes++;
+
     if (ply >= MAX_PLY) {
         return eval(board);
     }
+
     if (ply > 0 && isDraw(board, ply)) {
         return 0;
     }
+
     int static_eval;
     int best_value;
     MoveList moves;
+
     if (board.inCheck()) {
         best_value = -SCORE_MAX + std::min(ply, (int)MAX_PLY - 1);
         getLegalMoves(board, moves);
@@ -173,23 +178,28 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
                 best_move_index = j;
             }
         }
+
         moves.sort_item(best_move_index);
         std::swap(scores[i], scores[best_move_index]);
-
         Move noisy_move = moves[i];
+
         // SEE
         if (!board.inCheck() && !staticExchangeEval(board, noisy_move, 0)) {
             continue;
         }
+
         board.makeMove(noisy_move);
         int score = -quiesce(board, -beta, -alpha, ply + 1, qply + 1);
         board.undoMove(noisy_move);
+
         if (score >= beta) {
             return score;
         }
+
         if (score > best_value) {
             best_value = score;
         }
+
         if (score > alpha) {
             alpha = score;
         }
@@ -343,6 +353,7 @@ int search(
     if (in_check) {
         depth++; // check extension
     }
+
     if (in_check) { // important; this prevents the improving flag from being false after check sequence finsishes
         ss->static_eval = (ply >= 2 ? (ss - 2)->static_eval : 0);
     } else {
@@ -367,7 +378,6 @@ int search(
 
     if constexpr (Type != ROOT_NODE) {
         // rfp (prune worse positions harder with improving position)
-        // TODO Tune the rfp margin constant
         if (!is_pv && !in_check && depth <= 6 && static_eval - RFP_MARGIN * (depth - (improving && depth > 1)) >= beta) {
             return static_eval;
         }
@@ -394,7 +404,6 @@ int search(
         }
 
         // Probcut
-        // TODO: needs tuning
         int prob_beta = beta + PROB_BETA_OFFSET;
         if (!is_pv && !in_check && depth >= 6 && (!tt_hit || tt_entry.score >= prob_beta || tt_entry.depth < depth - 3)) {
             // Check noisy moves
@@ -465,8 +474,8 @@ int search(
     bool futility_pruning = !is_pv && !in_check && depth <= FP_DEPTH_MAX && static_eval + FUTILITY_MARGIN * depth <= alpha;
 
     MovePicker picker(board, REGULAR, tt_hit ? tt_entry.best_move : NO_MOVE, ss->killers[0], ss->killers[1], ss);
-
     Move move;
+
     while ((move = picker.nextMove()) != NO_MOVE) {
         legal_seen++;
 
@@ -483,6 +492,7 @@ int search(
 
         bool is_quiet_move = !Capture(move) && !Prom(move);
         bool gives_check = givesCheck(board, move);
+
         // futility pruning: if static_eval + margin <= alpha, prune quiet moves bc they are unlikely to improve position
         if (futility_pruning && moves_searched > 0 && is_quiet_move && !gives_check) {
             continue;
@@ -605,6 +615,7 @@ int search(
         if (score > best_score) {
             best_score = score;
             best_move = move;
+
             if (score > alpha) {
                 alpha = score;
                 // Update PV for this ply from the pre-allocated table
@@ -715,15 +726,19 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
     if (syz_dtz && TB_LARGEST > 0 && bitCount(board.getOcc(BOTH)) <= std::min<int>(syz_probe_limit, TB_LARGEST) && !board.getCastlingRights()) {
         TbRootMoves tb_roots;
         bool has_repeated = hasRepeated(board);
+
         if (board.probeDTZ(tb_roots, has_repeated) && tb_roots.size > 0) {
             int best_rank = tb_roots.moves[0].tbRank;
+
             for (uint16_t i = 1; i < tb_roots.size; i++) {
                 best_rank = std::max(best_rank, tb_roots.moves[i].tbRank);
             }
+            
             for (uint16_t i = 0; i < tb_roots.size; i++) {
                 if (tb_roots.moves[i].tbRank != best_rank) {
                     continue;
                 }
+
                 PyrrhicMove move = tb_roots.moves[i].move;
                 Square from = static_cast<Square>(flipRank(PYRRHIC_MOVE_FROM(move)));
                 Square to = static_cast<Square>(flipRank(PYRRHIC_MOVE_TO(move)));
@@ -732,6 +747,7 @@ Move search(Board& board, int max_depth, int& best_score, const GoParams& params
                 DefaultPiece promo = flags == PYRRHIC_FLAG_QPROMO ? QUEEN
                                : flags == PYRRHIC_FLAG_RPROMO ? ROOK
                                : flags == PYRRHIC_FLAG_BPROMO ? BISHOP : KNIGHT;
+
                 for (Move m : legal_probe) {
                     if (From(m) != from || To(m) != to) {
                         continue;
