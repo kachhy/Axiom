@@ -112,6 +112,8 @@ static inline void newGame(Board& board) {
 }
 
 static inline void initOptions() {
+    registerTunables();
+
     setOption("Hash", SpinOption{ 1, 16384, 256, [](int mb) { tt.resize(mb); } });
     setOption("Threads", SpinOption{ 1, 1, 1, nullptr });
     setOption("MultiPV", SpinOption{ 1, 255, 1, [](int mpv) { multi_pv = mpv; } });
@@ -261,6 +263,8 @@ int uciStartup() {
         std::cin >> buffer;
         if (buffer == "setoption") {
             changeOptions();
+        } else if (buffer == "spsa") {
+            printSPSAInput();
         } else if (buffer == "isready") {
             return 1; // ready to start the game
         } else if (buffer == "quit") {
@@ -294,6 +298,8 @@ void uci() {
 
         if (buffer == "setoption") {
             changeOptions();
+        } else if (buffer == "spsa") {
+            printSPSAInput();
         } else if (buffer == "go") {
             go(board);
         } else if (buffer == "position") {

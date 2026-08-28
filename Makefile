@@ -5,6 +5,8 @@ EVALFILE=nn-0d2fd98ff872a9a1-v2.nnue
 
 CXXFLAGS += -DEVALFILE='"$(EVALFILE)"'
 
+CXXFLAGS += -DSPSA_TUNE # REMOVE ON MAIN BRANCH
+
 OBJDIR=build
 SRC=$(shell find src -name '*.cpp')
 C_SRC=$(filter-out %tbchess.c,$(shell find src -name '*.c'))
@@ -47,6 +49,14 @@ ifneq ($(filter tune,$(MAKECMDGOALS)),)
 	CXXFLAGS += -DTUNING -O3 -flto -march=native
 	OBJDIR:=$(OBJDIR)/tune
 endif
+ifneq ($(filter spsa,$(MAKECMDGOALS)),)
+	CXXFLAGS += -DSPSA_TUNE -O3 -flto
+	LDFLAGS += -flto
+ifneq ($(shell uname),Darwin)
+	LDFLAGS += -static
+endif
+	OBJDIR:=$(OBJDIR)/spsa
+endif
 ifneq ($(filter perft,$(MAKECMDGOALS)),)
 	CXXFLAGS += -O3 -flto -DPERFT
 	LDFLAGS += -flto
@@ -64,6 +74,7 @@ lto: $(EXE)
 native: $(EXE)
 pg: $(EXE)
 tune: $(EXE)
+spsa: $(EXE)
 perft: $(EXE)
 
 $(EXE): $(OBJ) $(C_OBJ)
