@@ -143,11 +143,9 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
 
     int static_eval;
     int best_value;
-    MoveList moves;
 
     if (board.inCheck()) {
         best_value = -SCORE_MAX + std::min(ply, (int)MAX_PLY - 1);
-        getLegalMoves(board, moves);
     } else {
         static_eval = eval(board);
         best_value = static_eval;
@@ -157,32 +155,12 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
         if (best_value > alpha) {
             alpha = best_value;
         }
-        getNoisyMoves(board, moves);
     }
 
-    std::array<int, MAX_MOVES> scores;
-    for (uint8_t i = 0; i < moves.size(); i++) {
-        if (Capture(moves[i]) || IsEP(moves[i])) {
-            DefaultPiece attacker = makeDefaultPiece(MovePiece(moves[i]));
-            Piece victim_piece = IsEP(moves[i]) ? makePiece(PAWN, board.getXSTM()) : board.pieceAt(To(moves[i]));
-            scores[i] = MVV_LVA[makeDefaultPiece(victim_piece)][attacker];
-        } else {
-            scores[i] = 0; // only here if in check
-        }
-    }
+    MovePicker picker(board, QSEARCH);
+    Move noisy_move;
 
-    for (uint8_t i = 0; i < moves.size(); i++) {
-        uint8_t best_move_index = i;
-        for (uint8_t j = i + 1; j < moves.size(); j++) {
-            if (scores[j] > scores[best_move_index]) {
-                best_move_index = j;
-            }
-        }
-
-        moves.sort_item(best_move_index);
-        std::swap(scores[i], scores[best_move_index]);
-        Move noisy_move = moves[i];
-
+    while ((noisy_move = picker.nextMove()) != NO_MOVE) {
         // SEE
         if (!board.inCheck() && !staticExchangeEval(board, noisy_move, 0)) {
             continue;

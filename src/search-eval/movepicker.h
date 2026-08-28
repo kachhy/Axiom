@@ -28,6 +28,7 @@ private:
     MovePickerType type;
     SearchStack* ss;
     MovePickerStage stage;
+    bool in_check;
 
     MoveList loud_moves;
     MoveList quiet_moves;
@@ -45,8 +46,8 @@ private:
     int scoreQuietMove(Move move);
     int scoreLoudMove(Move move);
 public:
-    MovePicker(const Board& board, MovePickerType type, Move tt_move, Move killer1, Move killer2, SearchStack* ss) :
-        board(board), type(type), ss(ss), tt_move(tt_move), killer1(killer1), killer2(killer2) {
+    MovePicker(const Board& board, MovePickerType type, Move tt_move = NO_MOVE, Move killer1 = NO_MOVE, Move killer2 = NO_MOVE, SearchStack* ss = nullptr) :
+        board(board), type(type), ss(ss), in_check(board.inCheck()), tt_move(tt_move), killer1(killer1), killer2(killer2) {
         stage = (tt_move == NO_MOVE) ? INIT_CAPTURES : TT_MOVE;
     }
 

@@ -153,7 +153,8 @@ static bool isLegal(Move move, const Board& board) {
 }
 
 int MovePicker::scoreQuietMove(Move move) {
-    return getScoreHistory(board.getSTM(), move) + getContHist(ss, board.getSTM(), move);
+    // Qsearch has no search stack, so continuation history is unavailable there
+    return getScoreHistory(board.getSTM(), move) + (ss ? getContHist(ss, board.getSTM(), move) : 0);
 }
 
 int MovePicker::scoreLoudMove(Move move) {
@@ -226,9 +227,10 @@ Move MovePicker::nextMove() {
 
         if (type == QSEARCH) {
             stage = BAD_CAPTURES;
-        } else {
-            stage = KILLER1;
+            goto qsearch_resume;
         }
+        
+        stage = KILLER1;
     case KILLER1:
         stage = KILLER2;
         if (ss->killers[0] != tt_move && isLegal(ss->killers[0], board)) {
@@ -240,6 +242,7 @@ Move MovePicker::nextMove() {
             return ss->killers[1];
         }
     case BAD_CAPTURES:
+qsearch_resume:
         while (loud_moves_start < loud_moves.size()) {
             int best_index = loud_moves_start;
 
@@ -261,11 +264,13 @@ Move MovePicker::nextMove() {
             return best_move;
         }
 
-        if (type == QSEARCH) {
+        // In check we need evasions
+        if (type == QSEARCH && !in_check) {
             stage = END;
-        } else {
-            stage = INIT_QUIET;
+            goto end;
         }
+
+        stage = INIT_QUIET;
     case INIT_QUIET: stage = QUIET_MOVES; initQuiets();
     case QUIET_MOVES:
         while (quiet_moves_start < quiet_moves.size()) {
@@ -282,7 +287,7 @@ Move MovePicker::nextMove() {
             std::swap(quiet_scores[quiet_moves_start], quiet_scores[best_index]);
             quiet_moves_start++;
 
-            if (best_move == tt_move || best_move == ss->killers[0] || best_move == ss->killers[1]) {
+            if (best_move == tt_move || (ss && (best_move == ss->killers[0] || best_move == ss->killers[1]))) {
                 continue; // already yielded at the TT/killer stages
             }
 
@@ -292,6 +297,7 @@ Move MovePicker::nextMove() {
         stage = END;
     default:
         case END:
+end:
             return NO_MOVE;
     }
 }
