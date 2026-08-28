@@ -158,8 +158,11 @@ int MovePicker::scoreQuietMove(Move move) {
 }
 
 int MovePicker::scoreLoudMove(Move move) {
+    // Qsearch in check searches every evasion regardless of SEE
+    const bool skip_see = (type == QSEARCH && in_check);
+
     // Good SEE capture
-    if ((Capture(move) || IsEP(move)) && staticExchangeEval(board, move, 0)) {
+    if (!skip_see && (Capture(move) || IsEP(move)) && staticExchangeEval(board, move, 0)) {
         DefaultPiece attacker = makeDefaultPiece(MovePiece(move));
         Piece victim_piece = IsEP(move) ? makePiece(PAWN, board.getXSTM()) : board.pieceAt(To(move));
         DefaultPiece victim = makeDefaultPiece(victim_piece);
@@ -226,10 +229,17 @@ Move MovePicker::nextMove() {
         }
 
         if (type == QSEARCH) {
+            // Bad SEE captures are never searched in qsearch
+            // except in check
+            if (!in_check) {
+                stage = END;
+                goto end;
+            }
+
             stage = BAD_CAPTURES;
             goto qsearch_resume;
         }
-        
+
         stage = KILLER1;
     case KILLER1:
         stage = KILLER2;
@@ -264,12 +274,7 @@ qsearch_resume:
             return best_move;
         }
 
-        // In check we need evasions
-        if (type == QSEARCH && !in_check) {
-            stage = END;
-            goto end;
-        }
-
+        // Qsearch only reaches this point when in check
         stage = INIT_QUIET;
     case INIT_QUIET: stage = QUIET_MOVES; initQuiets();
     case QUIET_MOVES:

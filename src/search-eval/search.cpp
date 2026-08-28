@@ -161,11 +161,6 @@ int quiesce(Board& board, int alpha, int beta, int ply, int qply) {
     Move noisy_move;
 
     while ((noisy_move = picker.nextMove()) != NO_MOVE) {
-        // SEE
-        if (!board.inCheck() && !staticExchangeEval(board, noisy_move, 0)) {
-            continue;
-        }
-
         board.makeMove(noisy_move);
         int score = -quiesce(board, -beta, -alpha, ply + 1, qply + 1);
         board.undoMove(noisy_move);
