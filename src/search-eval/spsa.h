@@ -21,7 +21,21 @@
     INT (LMR_DEPTH_CUTOFF,           1,     1,     6,    1)                    \
     INT (ASPIRATION_DEPTH_CUTOFF,    3,     1,     8,    1)                    \
     INT (SEE_DEPTH_MAX,              8,     3,    15,    1)                    \
+    INT (SEE_CAPTURE_MARGIN,        20,     5,    60,    3)                    \
     INT (TT_HIT_DEPTH_BONUS,         6,     0,    12,    1)                    \
+    INT (RFP_DEPTH_MAX,              6,     3,    12,    1)                    \
+    /* Null move reduction: NMP_BASE + depth / NMP_DEPTH_DIVISOR */            \
+    INT (NMP_BASE,                   3,     1,     6,    1)                    \
+    INT (NMP_DEPTH_DIVISOR,          6,     2,    12,    1)                    \
+    /* ProbCut */                                                              \
+    INT (PROBCUT_DEPTH_MIN,          6,     3,    12,    1)                    \
+    INT (PROBCUT_TT_DEPTH_MARGIN,    3,     1,     6,    1)                    \
+    INT (PROBCUT_REDUCTION,          4,     2,     8,    1)                    \
+    /* LMR reduction adjustments, in plies */                                  \
+    INT (LMR_DEPTH_CAP,              2,     1,     5,    1)                    \
+    INT (LMR_TT_CAPTURE,             1,     0,     3,    1)                    \
+    INT (LMR_IMPROVING,              1,     0,     3,    1)                    \
+    INT (LMR_NO_TT_PV,               1,     0,     3,    1)                    \
     /* Floating point terms, stored scaled by 1e6. The scale has to hold the   \
        original six-decimal constants exactly */                               \
     REAL(LMR_VALUE,             828061,  200000, 1600000,  70000, 1000000.0)   \
