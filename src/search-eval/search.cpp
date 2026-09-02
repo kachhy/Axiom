@@ -378,7 +378,7 @@ int search(
 
     if constexpr (Type != ROOT_NODE) {
         // rfp (prune worse positions harder with improving position)
-        if (!is_pv && !in_check && depth <= 6 && static_eval - RFP_MARGIN * (depth - (improving && depth > 1)) >= beta) {
+        if (!is_pv && !in_check && depth <= RFP_DEPTH_MAX && static_eval - RFP_MARGIN * (depth - (improving && depth > 1)) >= beta) {
             return static_eval;
         }
 
@@ -386,7 +386,7 @@ int search(
         BitBoard non_pawn_material =
             board.getOcc(board.getSTM()) & ~board.getPieceBB(makePiece(PAWN, board.getSTM())) & ~board.getPieceBB(makePiece(KING, board.getSTM()));
         if (!is_pv && can_make_null_move && !in_check && depth >= NMP_DEPTH_CUTOFF && static_eval >= beta && non_pawn_material) {
-            int nmp_reduction = 3 + depth / 6;
+            int nmp_reduction = NMP_BASE + depth / NMP_DEPTH_DIVISOR;
             ss->move = NO_MOVE;
             board.makeNullMove();
             tt.prefetch(board.hash());
@@ -405,7 +405,8 @@ int search(
 
         // Probcut
         int prob_beta = beta + PROB_BETA_OFFSET;
-        if (!is_pv && !in_check && depth >= 6 && (!tt_hit || tt_entry.score >= prob_beta || tt_entry.depth < depth - 3)) {
+        if (!is_pv && !in_check && depth >= PROBCUT_DEPTH_MIN
+            && (!tt_hit || tt_entry.score >= prob_beta || tt_entry.depth < depth - PROBCUT_TT_DEPTH_MARGIN)) {
             // Check noisy moves
             MoveList pc_moves;
             getNoisyMoves(board, pc_moves);
@@ -434,7 +435,10 @@ int search(
 
                 int score = -quiesce(board, -prob_beta, -prob_beta + 1, ply + 1, 0);
                 if (score >= prob_beta) {
-                    score = -search<NON_ROOT_NODE>(board, depth - 4, -prob_beta, -prob_beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table, max_ply, rml);
+                    score = -search<NON_ROOT_NODE>(
+                        board, depth - PROBCUT_REDUCTION, -prob_beta, -prob_beta + 1, !cutnode, hard_cap, max_nodes, start, ply + 1, ss + 1, true, pv_table,
+                        max_ply, rml
+                    );
                     board.undoMove(move);
 
                     if (score >= prob_beta) {
@@ -504,7 +508,8 @@ int search(
             continue;
         }
 
-        if (!in_check && moves_searched > 0 && Capture(move) && depth <= SEE_DEPTH_MAX && !staticExchangeEval(board, move, -20 * depth * depth)) {
+        if (!in_check && moves_searched > 0 && Capture(move) && depth <= SEE_DEPTH_MAX
+            && !staticExchangeEval(board, move, -SEE_CAPTURE_MARGIN * depth * depth)) {
             continue;
         }
 
@@ -562,7 +567,7 @@ int search(
             if (moves_searched >= LMR_MOVES_CUTOFF && depth >= LMR_DEPTH_CUTOFF && !Capture(move) && !Prom(move) && !in_check) {
                 // improving flag = search more carefully when good position is improving (less reduction)
                 int lmr_reduction = std::max(
-                    0, std::min(LMR_TABLE[std::min(depth, LMR_TABLE_SIZE - 1)][std::min(moves_searched, LMR_TABLE_SIZE - 1)], depth - 2)
+                    0, std::min(LMR_TABLE[std::min(depth, LMR_TABLE_SIZE - 1)][std::min(moves_searched, LMR_TABLE_SIZE - 1)], depth - LMR_DEPTH_CAP)
                 );
                 
                 // history-based reduction: reduce good-history quiets less, bad-history more.
@@ -571,11 +576,11 @@ int search(
                 lmr_reduction = std::max(0, lmr_reduction);
 
                 if (tt_hit && (Capture(tt_entry.best_move) || Prom(tt_entry.best_move))) {
-                    lmr_reduction++;
+                    lmr_reduction += LMR_TT_CAPTURE;
                 }
 
                 if (improving) {
-                    lmr_reduction--;
+                    lmr_reduction -= LMR_IMPROVING;
                 }
 
                 if (cutnode) {
@@ -583,7 +588,7 @@ int search(
                 }
 
                 if (!tt_hit && !is_pv) {
-                    lmr_reduction++;
+                    lmr_reduction += LMR_NO_TT_PV;
                 }
 
                 lmr_reduction = std::max(0, std::min(lmr_reduction, new_depth - 1));
