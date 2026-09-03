@@ -5,6 +5,8 @@ EVALFILE=nn-0d2fd98ff872a9a1-v2.nnue
 
 CXXFLAGS += -DEVALFILE='"$(EVALFILE)"'
 
+CXXFLAGS += -DSPSA_TUNE
+
 OBJDIR=build
 SRC=$(shell find src -name '*.cpp')
 C_SRC=$(filter-out %tbchess.c,$(shell find src -name '*.c'))
